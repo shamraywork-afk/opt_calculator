@@ -1,0 +1,152 @@
+from datetime import date
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import json
+import secrets
+
+ROOT = Path(__file__).parent
+DATA_FILE = ROOT / "orders.json"
+PORT = 8000
+LOGIN = "Shamrik"
+PASSWORD = "a0nw9u39"
+SESSIONS = set()
+
+
+def load_orders():
+    if not DATA_FILE.exists():
+        return []
+    try:
+        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def save_orders(orders):
+    DATA_FILE.write_text(
+        json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+class AppHandler(BaseHTTPRequestHandler):
+    def send_json(self, payload, status=200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def get_session(self):
+        cookie = self.headers.get("Cookie", "")
+        for item in cookie.split(";"):
+            name, _, value = item.strip().partition("=")
+            if name == "session" and value in SESSIONS:
+                return value
+        return None
+
+    def require_auth(self):
+        if self.get_session():
+            return True
+        self.send_json({"error": "Требуется авторизация"}, 401)
+        return False
+
+    def send_file(self, filename, content_type):
+        body = (ROOT / filename).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/api/orders":
+            self.send_json(load_orders())
+        elif self.path == "/api/auth":
+            self.send_json({"authenticated": bool(self.get_session())})
+        elif self.path == "/" or self.path == "/index.html":
+            self.send_file("index.html", "text/html; charset=utf-8")
+        elif self.path == "/styles.css":
+            self.send_file("styles.css", "text/css; charset=utf-8")
+        elif self.path == "/app.js":
+            self.send_file("app.js", "application/javascript; charset=utf-8")
+        else:
+            self.send_json({"error": "Не найдено"}, 404)
+
+    def do_POST(self):
+        if self.path == "/api/login":
+            self.login()
+            return
+        if self.path == "/api/logout":
+            session = self.get_session()
+            if session:
+                SESSIONS.discard(session)
+            self.send_json({"ok": True}, 200)
+            return
+        if self.path != "/api/orders":
+            self.send_json({"error": "Не найдено"}, 404)
+            return
+        if not self.require_auth():
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length))
+            orders = load_orders()
+            order = {
+                "id": payload.get("id") or str(int(date.today().strftime("%Y%m%d"))) + str(len(orders) + 1),
+                "number": str(payload.get("number", "")).strip(),
+                "date": str(payload.get("date", date.today().isoformat())),
+                "client": str(payload.get("client", "")).strip(),
+                "note": str(payload.get("note", "")).strip(),
+                "count": int(payload.get("count", 0)),
+                "pickers": [str(name).strip() for name in payload.get("pickers", []) if str(name).strip()],
+            }
+            if not order["number"] or order["count"] < 1 or len(order["pickers"]) not in (1, 2):
+                self.send_json({"error": "Проверьте номер, количество и состав сборщиков"}, 400)
+                return
+            existing_index = next((index for index, item in enumerate(orders) if item["id"] == order["id"]), None)
+            if existing_index is None:
+                orders.insert(0, order)
+            else:
+                orders[existing_index] = order
+            save_orders(orders)
+            self.send_json(order, 201)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            self.send_json({"error": "Некорректные данные"}, 400)
+
+    def login(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length))
+            if payload.get("login") != LOGIN or payload.get("password") != PASSWORD:
+                self.send_json({"error": "Неверный логин или пароль"}, 401)
+                return
+            session = secrets.token_urlsafe(32)
+            SESSIONS.add(session)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Set-Cookie", f"session={session}; HttpOnly; SameSite=Strict; Path=/")
+            body = json.dumps({"authenticated": True}).encode("utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (TypeError, json.JSONDecodeError):
+            self.send_json({"error": "Некорректные данные"}, 400)
+
+    def do_DELETE(self):
+        if not self.path.startswith("/api/orders/"):
+            self.send_json({"error": "Не найдено"}, 404)
+            return
+        if not self.require_auth():
+            return
+        order_id = self.path.rsplit("/", 1)[-1]
+        orders = [order for order in load_orders() if order["id"] != order_id]
+        save_orders(orders)
+        self.send_json({"ok": True})
+
+    def log_message(self, format, *args):
+        return
+
+
+if __name__ == "__main__":
+    print(f"Оптовый подсчёт запущен: http://localhost:{PORT}")
+    ThreadingHTTPServer(("localhost", PORT), AppHandler).serve_forever()

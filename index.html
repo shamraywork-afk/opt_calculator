@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Оптовый подсчёт</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">+</span><span>ОПТ / СБОРКА</span></div>
+      <div class="account-area"><div class="status"><span class="status-dot"></span> Локальная база</div><button class="login-btn" id="loginOpen" type="button">Войти</button><button class="login-btn hidden" id="logoutBtn" type="button">Выйти</button></div>
+    </header>
+
+    <section class="intro">
+      <div>
+        <p class="eyebrow">Рабочая ведомость</p>
+        <h1>Подсчёт позиций</h1>
+        <p class="subtitle">Собранные заказы и нагрузка на команду в одном экране.</p>
+      </div>
+      <div class="date-stamp"><span id="todayLabel"></span><strong id="ordersCount">0 заказов</strong></div>
+    </section>
+
+    <section class="dashboard">
+      <aside class="panel form-panel">
+        <div class="panel-heading"><div><span class="section-kicker">01 / Новый ввод</span><h2 id="formTitle">Добавить заказ</h2></div><span class="plus-icon">+</span></div>
+        <form id="orderForm">
+          <input type="hidden" id="orderId">
+          <label>Номер заказа<input id="number" required placeholder="Например, 10482"></label>
+          <div class="form-grid">
+            <label>Дата<input id="orderDate" type="date" required></label>
+            <label>Товаров в заказе<input id="count" type="number" min="1" step="1" required placeholder="0"></label>
+          </div>
+          <label>Клиент / точка<input id="client" placeholder="Название клиента"></label>
+          <label>Сборщики <span class="label-hint">до двух человек</span>
+            <div class="picker-list"><input class="picker" required placeholder="Имя сборщика"><input class="picker" placeholder="Второй сборщик"></div>
+          </label>
+          <label>Комментарий<textarea id="note" rows="3" placeholder="Необязательно"></textarea></label>
+          <div class="form-actions"><button class="primary-btn" type="submit"><span>+</span> <span id="submitText">Добавить в ведомость</span></button><button class="text-btn hidden" id="cancelEdit" type="button">Отмена</button></div>
+        </form>
+        <div class="rule"></div>
+        <div class="tip"><span class="tip-icon">i</span><p>При работе в паре нечётное количество позиций округляется вверх для каждого сборщика.</p></div>
+      </aside>
+
+      <div class="content-column">
+        <section class="metric-row">
+          <div class="metric"><span class="metric-label">Всего позиций</span><strong id="totalCount">0</strong><span class="metric-foot">за выбранную дату</span></div>
+          <div class="metric accent"><span class="metric-label">Активных сборщиков</span><strong id="pickerCount">0</strong><span class="metric-foot">человек в работе</span></div>
+          <div class="metric"><span class="metric-label">Среднее на заказ</span><strong id="averageCount">0</strong><span class="metric-foot">позиций</span></div>
+        </section>
+
+        <nav class="view-tabs" aria-label="Разделы ведомости">
+          <button class="view-tab active" type="button" data-view="ledger">Журнал</button>
+          <button class="view-tab" type="button" data-view="monthly">Месяц</button>
+        </nav>
+
+        <section class="panel ledger-panel" data-panel="ledger">
+          <div class="ledger-head"><div><span class="section-kicker">02 / Журнал</span><h2>Заказы за день</h2></div><div class="toolbar"><label class="date-filter"><span>Показать</span><input id="filterDate" type="date"></label><button class="icon-btn" id="exportBtn" title="Экспортировать данные">↓</button></div></div>
+          <div class="picker-totals" id="pickerTotals"></div>
+          <div class="table-wrap"><table><thead><tr><th>Заказ</th><th>Клиент</th><th>Сборщики</th><th>Позиций</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><span class="empty-mark">∅</span><h3>Ведомость пока пуста</h3><p>Добавьте первый собранный заказ через форму слева.</p></div></div>
+        </section>
+
+        <section class="panel ledger-panel monthly-panel hidden" data-panel="monthly">
+          <div class="ledger-head"><div><span class="section-kicker">03 / Рейтинг</span><h2 id="monthlyTitle">Итоги месяца</h2></div><div class="month-total"><span>Собрано позиций</span><strong id="monthlyTotal">0</strong></div></div>
+          <div class="table-wrap"><table class="ranking-table"><thead><tr><th>Место</th><th>Сборщик</th><th>Позиций</th></tr></thead><tbody id="monthlyBody"></tbody></table><div class="empty-state hidden" id="monthlyEmpty"><span class="empty-mark">∅</span><h3>Данных за месяц пока нет</h3><p>Рейтинг появится после добавления первого заказа.</p></div></div>
+        </section>
+      </div>
+    </section>
+    <footer><span>ОПТ / СБОРКА</span><span>Данные сохраняются на этом компьютере</span></footer>
+  </main>
+  <div class="edit-modal hidden" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <form class="edit-box" id="editForm">
+      <button class="modal-close" id="editClose" type="button" aria-label="Закрыть">×</button>
+      <span class="section-kicker">Редактирование заказа</span><h2 id="editTitle">Изменить заказ</h2>
+      <div class="form-grid"><label>Номер заказа<input id="editNumber" required></label><label>Дата<input id="editDate" type="date" required></label></div>
+      <div class="form-grid"><label>Товаров в заказе<input id="editCount" type="number" min="1" step="1" required></label><label>Клиент / точка<input id="editClient"></label></div>
+      <label>Сборщики <span class="label-hint">до двух человек</span><div class="picker-list"><input class="edit-picker" id="editPickerOne" required><input class="edit-picker" id="editPickerTwo"></div></label>
+      <label>Комментарий<textarea id="editNote" rows="3"></textarea></label>
+      <p class="login-error hidden" id="editError"></p>
+      <div class="form-actions"><button class="primary-btn" type="submit">Сохранить изменения</button><button class="text-btn" id="editCancel" type="button">Отмена</button></div>
+    </form>
+  </div>
+  <div class="login-modal hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form class="login-box" id="loginForm">
+      <button class="modal-close" id="loginClose" type="button" aria-label="Закрыть">×</button>
+      <span class="section-kicker">Доступ редактора</span><h2 id="loginTitle">Вход в систему</h2>
+      <label>Логин<input id="loginInput" autocomplete="username" required></label>
+      <label>Пароль<input id="passwordInput" type="password" autocomplete="current-password" required></label>
+      <p class="login-error hidden" id="loginError"></p>
+      <button class="primary-btn" type="submit">Войти</button>
+    </form>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
