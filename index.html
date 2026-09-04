@@ -94,11 +94,12 @@
   <div class="login-modal hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <form class="login-box" id="loginForm">
       <button class="modal-close" id="loginClose" type="button" aria-label="Закрыть">×</button>
-      <span class="section-kicker">Доступ редактора</span><h2 id="loginTitle">Вход в систему</h2>
+      <span class="section-kicker">Доступ редактора</span><h2 id="loginTitle">Вход в систему</h2><p class="auth-hint" id="authHint"></p>
       <label>Логин<input id="loginInput" autocomplete="username" required></label>
       <label>Пароль<input id="passwordInput" type="password" autocomplete="current-password" required></label>
+      <label class="hidden" id="passwordConfirmLabel">Повторите пароль<input id="passwordConfirmInput" type="password" autocomplete="new-password"></label>
       <p class="login-error hidden" id="loginError"></p>
-      <button class="primary-btn" type="submit">Войти</button>
+      <button class="primary-btn" id="authSubmit" type="submit">Войти</button>
     </form>
   </div>
   <script src="/app.js"></script>

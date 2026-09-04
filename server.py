@@ -1,15 +1,18 @@
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import hashlib
+import hmac
 import json
 import secrets
+import threading
 
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "orders.json"
+ADMIN_FILE = ROOT / "admin.json"
 PORT = 8000
-LOGIN = "Shamrik"
-PASSWORD = "a0nw9u39"
 SESSIONS = set()
+ADMIN_LOCK = threading.Lock()
 
 
 def load_orders():
@@ -24,6 +27,30 @@ def load_orders():
 def save_orders(orders):
     DATA_FILE.write_text(
         json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def load_admin():
+    if not ADMIN_FILE.exists():
+        return None
+    try:
+        admin = json.loads(ADMIN_FILE.read_text(encoding="utf-8"))
+        if admin.get("login") and admin.get("salt") and admin.get("password_hash"):
+            return admin
+    except (OSError, AttributeError, json.JSONDecodeError):
+        pass
+    return None
+
+
+def hash_password(password, salt):
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120000).hex()
+
+
+def save_admin(login, password):
+    salt = secrets.token_hex(16)
+    ADMIN_FILE.write_text(
+        json.dumps({"login": login, "salt": salt, "password_hash": hash_password(password, salt)}, indent=2),
+        encoding="utf-8",
     )
 
 
@@ -62,7 +89,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if self.path == "/api/orders":
             self.send_json(load_orders())
         elif self.path == "/api/auth":
-            self.send_json({"authenticated": bool(self.get_session())})
+            self.send_json({"authenticated": bool(self.get_session()), "has_admin": load_admin() is not None})
         elif self.path == "/" or self.path == "/index.html":
             self.send_file("index.html", "text/html; charset=utf-8")
         elif self.path == "/styles.css":
@@ -73,6 +100,9 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": "Не найдено"}, 404)
 
     def do_POST(self):
+        if self.path == "/api/register":
+            self.register()
+            return
         if self.path == "/api/login":
             self.login()
             return
@@ -143,20 +173,47 @@ class AppHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length))
-            if payload.get("login") != LOGIN or payload.get("password") != PASSWORD:
+            admin = load_admin()
+            if admin is None:
+                self.send_json({"error": "Сначала создайте админ-аккаунт"}, 409)
+                return
+            password = str(payload.get("password", ""))
+            password_hash = hash_password(password, admin["salt"])
+            if payload.get("login") != admin["login"] or not hmac.compare_digest(password_hash, admin["password_hash"]):
                 self.send_json({"error": "Неверный логин или пароль"}, 401)
                 return
-            session = secrets.token_urlsafe(32)
-            SESSIONS.add(session)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Set-Cookie", f"session={session}; HttpOnly; SameSite=Strict; Path=/")
-            body = json.dumps({"authenticated": True}).encode("utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self.start_session()
         except (TypeError, json.JSONDecodeError):
             self.send_json({"error": "Некорректные данные"}, 400)
+
+    def register(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length))
+            login = str(payload.get("login", "")).strip()
+            password = str(payload.get("password", ""))
+            if not login or len(login) > 64 or len(password) < 6:
+                self.send_json({"error": "Логин обязателен, пароль должен содержать минимум 6 символов"}, 400)
+                return
+            with ADMIN_LOCK:
+                if load_admin() is not None:
+                    self.send_json({"error": "Админ-аккаунт уже создан"}, 409)
+                    return
+                save_admin(login, password)
+            self.start_session()
+        except (TypeError, json.JSONDecodeError):
+            self.send_json({"error": "Некорректные данные"}, 400)
+
+    def start_session(self):
+        session = secrets.token_urlsafe(32)
+        SESSIONS.add(session)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Set-Cookie", f"session={session}; HttpOnly; SameSite=Strict; Path=/")
+        body = json.dumps({"authenticated": True}).encode("utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_DELETE(self):
         if not self.path.startswith("/api/orders/"):

@@ -1,4 +1,4 @@
-const state = { orders: [], filterDate: '', authenticated: false };
+const state = { orders: [], filterDate: '', authenticated: false, hasAdmin: false, authMode: 'login' };
 const $ = (selector) => document.querySelector(selector);
 const today = new Date().toISOString().slice(0, 10);
 
@@ -102,7 +102,19 @@ async function loadOrders() {
 async function loadAuth() {
   const response = await fetch('/api/auth');
   const data = await response.json();
+  state.hasAdmin = data.has_admin;
   setAuthState(data.authenticated);
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  const registration = mode === 'register';
+  $('#loginTitle').textContent = registration ? 'Первичная регистрация' : 'Вход в систему';
+  $('#authHint').textContent = registration ? 'Создайте единственный админ-аккаунт для этого компьютера.' : 'Введите данные администратора.';
+  $('#passwordConfirmLabel').classList.toggle('hidden', !registration);
+  $('#passwordConfirmInput').required = registration;
+  $('#authSubmit').textContent = registration ? 'Создать аккаунт' : 'Войти';
+  $('#loginError').classList.add('hidden');
 }
 
 function resetForm() {
@@ -127,7 +139,7 @@ $('#orderForm').addEventListener('submit', async (event) => {
 });
 
 $('#cancelEdit').addEventListener('click', resetForm);
-$('#loginOpen').addEventListener('click', () => { $('#loginModal').classList.remove('hidden'); $('#loginInput').focus(); });
+$('#loginOpen').addEventListener('click', () => { setAuthMode(state.hasAdmin ? 'login' : 'register'); $('#loginModal').classList.remove('hidden'); $('#loginInput').focus(); });
 $('#loginClose').addEventListener('click', () => { $('#loginModal').classList.add('hidden'); });
 $('#editClose').addEventListener('click', closeEditModal);
 $('#editCancel').addEventListener('click', closeEditModal);
@@ -149,9 +161,10 @@ document.querySelectorAll('[data-clear-scope]').forEach((button) => button.addEv
 }));
 $('#loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: $('#loginInput').value, password: $('#passwordInput').value }) });
-  if (!response.ok) { $('#loginError').textContent = 'Неверный логин или пароль'; $('#loginError').classList.remove('hidden'); return; }
-  $('#loginForm').reset(); $('#loginError').classList.add('hidden'); $('#loginModal').classList.add('hidden'); setAuthState(true);
+  if (state.authMode === 'register' && $('#passwordInput').value !== $('#passwordConfirmInput').value) { $('#loginError').textContent = 'Пароли не совпадают'; $('#loginError').classList.remove('hidden'); return; }
+  const response = await fetch(state.authMode === 'register' ? '/api/register' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: $('#loginInput').value, password: $('#passwordInput').value }) });
+  if (!response.ok) { $('#loginError').textContent = state.authMode === 'register' ? 'Не удалось создать аккаунт' : 'Неверный логин или пароль'; $('#loginError').classList.remove('hidden'); return; }
+  state.hasAdmin = true; $('#loginForm').reset(); $('#loginError').classList.add('hidden'); $('#loginModal').classList.add('hidden'); setAuthState(true);
 });
 $('#logoutBtn').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); closeCabinetModal(); resetForm(); setAuthState(false); });
 $('#filterDate').addEventListener('change', (event) => { state.filterDate = event.target.value; render(); });
