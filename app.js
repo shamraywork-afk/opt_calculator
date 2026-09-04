@@ -1,6 +1,9 @@
-const state = { orders: [], filterDate: '', authenticated: false, hasAdmin: false, authMode: 'login' };
+const state = { orders: [], filterDate: '', authenticated: false, hasAdmin: false, authMode: 'login', monthlyStart: '', monthlyEnd: '', user: null };
 const $ = (selector) => document.querySelector(selector);
 const today = new Date().toISOString().slice(0, 10);
+const defaultMonthlyStart = `${today.slice(0, 7)}-01`;
+state.monthlyStart = localStorage.getItem('monthlyStart') || defaultMonthlyStart;
+state.monthlyEnd = localStorage.getItem('monthlyEnd') || today;
 
 function formatDate(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
@@ -20,7 +23,7 @@ function getVisibleOrders() {
 
 function getMonthlyStats() {
   const totals = {};
-  const monthlyOrders = state.orders.filter((order) => order.date && order.date.slice(0, 7) === today.slice(0, 7));
+  const monthlyOrders = state.orders.filter((order) => order.date && order.date >= state.monthlyStart && order.date <= state.monthlyEnd);
   monthlyOrders.forEach((order) => {
     const share = Math.ceil(order.count / order.pickers.length);
     order.pickers.forEach((picker) => { totals[picker] = (totals[picker] || 0) + share; });
@@ -32,10 +35,15 @@ function renderMonthly() {
   const { monthlyOrders, totals } = getMonthlyStats();
   const ranking = Object.entries(totals).sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0], 'ru'));
   const total = monthlyOrders.reduce((sum, order) => sum + order.count, 0);
-  $('#monthlyTitle').textContent = `Итоги за ${new Date(`${today.slice(0, 7)}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`;
+  $('#monthlyTitle').textContent = `Итоги за ${formatDateRange(state.monthlyStart, state.monthlyEnd)}`;
   $('#monthlyTotal').textContent = total;
   $('#monthlyBody').innerHTML = ranking.map(([name, count], index) => `<tr><td class="rank">${index + 1}</td><td>${escapeHtml(name)}</td><td>${count}</td></tr>`).join('');
   $('#monthlyEmpty').classList.toggle('hidden', ranking.length > 0);
+}
+
+function formatDateRange(start, end) {
+  const format = (value) => new Date(`${value}T12:00:00`).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
+  return `${format(start)} - ${format(end)}`;
 }
 
 function render() {
@@ -55,7 +63,7 @@ function render() {
       <td>${escapeHtml(order.client || 'Без названия')}${order.note ? `<small>${escapeHtml(order.note)}</small>` : ''}</td>
       <td>${order.pickers.map((picker) => `<span class="person">${escapeHtml(picker)}</span>`).join('')}</td>
       <td>${order.count}</td>
-      <td>${state.authenticated ? `<button class="delete-btn" title="Изменить" data-edit="${order.id}">✎</button><button class="delete-btn" title="Удалить" data-delete="${order.id}">×</button>` : ''}</td></tr>`).join('');
+      <td>${state.user?.role === 'admin' ? `<button class="delete-btn" title="Изменить" data-edit="${order.id}">✎</button><button class="delete-btn" title="Удалить" data-delete="${order.id}">×</button>` : ''}</td></tr>`).join('');
   $('#emptyState').classList.toggle('hidden', visible.length > 0);
   $('#pickerTotals').innerHTML = Object.entries(pickerTotals).sort((a, b) => b[1] - a[1]).map(([name, count]) => `<span class="picker-total">${escapeHtml(name)} <strong>${count}</strong></span>`).join('');
   renderMonthly();
@@ -66,6 +74,14 @@ function setAuthState(authenticated) {
   $('#loginOpen').classList.toggle('hidden', authenticated);
   $('#cabinetOpen').classList.toggle('hidden', !authenticated);
   $('#orderForm').querySelectorAll('input, textarea, button').forEach((control) => { control.disabled = !authenticated; });
+  document.querySelectorAll('.admin-only').forEach((element) => element.classList.toggle('hidden', state.user?.role !== 'admin'));
+  if (state.user) {
+    $('#profileLogin').textContent = state.user.login;
+    $('#profileRole').textContent = state.user.role === 'admin' ? 'Администратор' : 'Сборщик';
+    $('#cabinetHint').textContent = state.user.role === 'admin' ? 'Доступны управление пользователями и полное управление заказами.' : 'Вы можете вносить новые данные о собранных заказах.';
+    $('#profileAvatar').textContent = state.user.avatar ? '' : state.user.login[0].toUpperCase();
+    $('#profileAvatar').style.backgroundImage = state.user.avatar ? `url(${state.user.avatar})` : '';
+  }
   render();
 }
 
@@ -76,6 +92,11 @@ function closeEditModal() {
 
 function closeCabinetModal() {
   $('#cabinetModal').classList.add('hidden');
+}
+
+function showMonthlyPeriod() {
+  $('#monthlyStart').value = state.monthlyStart;
+  $('#monthlyEnd').value = state.monthlyEnd;
 }
 
 function openEditModal(order) {
@@ -103,7 +124,10 @@ async function loadAuth() {
   const response = await fetch('/api/auth');
   const data = await response.json();
   state.hasAdmin = data.has_admin;
-  setAuthState(data.authenticated);
+  if (data.authenticated || !state.authenticated) {
+    state.user = data.user;
+    setAuthState(data.authenticated);
+  }
 }
 
 function setAuthMode(mode) {
@@ -145,9 +169,48 @@ $('#editClose').addEventListener('click', closeEditModal);
 $('#editCancel').addEventListener('click', closeEditModal);
 $('#editModal').addEventListener('click', (event) => { if (event.target === $('#editModal')) closeEditModal(); });
 $('#loginModal').addEventListener('click', (event) => { if (event.target === $('#loginModal')) $('#loginModal').classList.add('hidden'); });
-$('#cabinetOpen').addEventListener('click', () => { $('#cabinetModal').classList.remove('hidden'); });
+$('#cabinetOpen').addEventListener('click', () => { showMonthlyPeriod(); $('#cabinetModal').classList.remove('hidden'); });
 $('#cabinetClose').addEventListener('click', closeCabinetModal);
 $('#cabinetModal').addEventListener('click', (event) => { if (event.target === $('#cabinetModal')) closeCabinetModal(); });
+$('#avatarInput').addEventListener('change', () => {
+  const file = $('#avatarInput').files[0];
+  if (!file) return;
+  if (file.size > 500000) { alert('Размер аватара не должен превышать 500 КБ.'); return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const response = await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar: reader.result }) });
+    if (!response.ok) { alert('Не удалось сохранить аватар.'); return; }
+    state.user = await response.json();
+    setAuthState(true);
+  };
+  reader.readAsDataURL(file);
+});
+$('#addUserButton').addEventListener('click', async () => {
+  const login = $('#newUserLogin').value.trim();
+  const password = $('#newUserPassword').value;
+  const response = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) });
+  if (!response.ok) { $('#userError').textContent = response.status === 409 ? 'Такой пользователь уже существует.' : 'Логин и пароль заполнены некорректно.'; $('#userError').classList.remove('hidden'); return; }
+  $('#newUserLogin').value = ''; $('#newUserPassword').value = ''; $('#userError').classList.add('hidden'); alert('Пользователь добавлен.');
+});
+$('#savePeriod').addEventListener('click', () => {
+  const start = $('#monthlyStart').value;
+  const end = $('#monthlyEnd').value;
+  if (!start || !end || start > end) { alert('Укажите корректный период: начало не может быть позже окончания.'); return; }
+  state.monthlyStart = start;
+  state.monthlyEnd = end;
+  localStorage.setItem('monthlyStart', start);
+  localStorage.setItem('monthlyEnd', end);
+  closeCabinetModal();
+  render();
+});
+$('#resetPeriod').addEventListener('click', () => {
+  state.monthlyStart = defaultMonthlyStart;
+  state.monthlyEnd = today;
+  localStorage.removeItem('monthlyStart');
+  localStorage.removeItem('monthlyEnd');
+  showMonthlyPeriod();
+  render();
+});
 document.querySelectorAll('[data-clear-scope]').forEach((button) => button.addEventListener('click', async () => {
   const scope = button.dataset.clearScope;
   const labels = { day: 'выбранный день', month: 'текущий месяц', all: 'все записи' };
@@ -164,9 +227,9 @@ $('#loginForm').addEventListener('submit', async (event) => {
   if (state.authMode === 'register' && $('#passwordInput').value !== $('#passwordConfirmInput').value) { $('#loginError').textContent = 'Пароли не совпадают'; $('#loginError').classList.remove('hidden'); return; }
   const response = await fetch(state.authMode === 'register' ? '/api/register' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: $('#loginInput').value, password: $('#passwordInput').value }) });
   if (!response.ok) { $('#loginError').textContent = state.authMode === 'register' ? 'Не удалось создать аккаунт' : 'Неверный логин или пароль'; $('#loginError').classList.remove('hidden'); return; }
-  state.hasAdmin = true; $('#loginForm').reset(); $('#loginError').classList.add('hidden'); $('#loginModal').classList.add('hidden'); setAuthState(true);
+  state.hasAdmin = true; state.user = await response.json(); $('#loginForm').reset(); $('#loginError').classList.add('hidden'); $('#loginModal').classList.add('hidden'); setAuthState(true);
 });
-$('#logoutBtn').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); closeCabinetModal(); resetForm(); setAuthState(false); });
+$('#logoutBtn').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); closeCabinetModal(); resetForm(); state.user = null; setAuthState(false); });
 $('#filterDate').addEventListener('change', (event) => { state.filterDate = event.target.value; render(); });
 document.querySelectorAll('.view-tab').forEach((tab) => tab.addEventListener('click', () => {
   document.querySelectorAll('.view-tab').forEach((item) => item.classList.toggle('active', item === tab));

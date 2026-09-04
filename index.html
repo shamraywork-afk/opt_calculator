@@ -85,9 +85,12 @@
     <section class="cabinet-box">
       <button class="modal-close" id="cabinetClose" type="button" aria-label="Закрыть">×</button>
       <span class="section-kicker">Профиль редактора</span><h2 id="cabinetTitle">Личный кабинет</h2>
-      <div class="profile-row"><span class="profile-avatar">S</span><div><strong>Shamrik</strong><small>Авторизованный пользователь</small></div></div>
-      <p class="cabinet-hint">В кабинете доступны редактирование и удаление заказов в журнале.</p>
-      <div class="cleanup-section"><span class="section-kicker">Управление записями</span><button class="cleanup-btn" data-clear-scope="day" type="button">Очистить записи за день</button><button class="cleanup-btn" data-clear-scope="month" type="button">Очистить записи за месяц</button><button class="cleanup-btn danger" data-clear-scope="all" type="button">Очистить все записи</button></div>
+      <div class="profile-row"><div class="profile-avatar" id="profileAvatar">S</div><div><strong id="profileLogin">Shamrik</strong><small id="profileRole">Администратор</small></div></div>
+      <div class="avatar-section admin-only"><span class="section-kicker">Аватар профиля</span><label class="file-btn">Выбрать изображение<input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp"></label><small class="field-hint">PNG, JPG или WebP, до 500 КБ.</small></div>
+      <p class="cabinet-hint" id="cabinetHint">В кабинете доступны редактирование и удаление заказов в журнале.</p>
+      <div class="user-section admin-only"><span class="section-kicker">Новый пользователь</span><label>Логин<input id="newUserLogin" autocomplete="off"></label><label>Пароль<input id="newUserPassword" type="password" autocomplete="new-password"></label><button class="primary-btn" id="addUserButton" type="button">Добавить пользователя</button><p class="login-error hidden" id="userError"></p></div>
+      <div class="work-period"><span class="section-kicker">Рабочий месяц</span><p>Период может переходить между календарными месяцами.</p><div class="form-grid"><label>Начало<input id="monthlyStart" type="date" required></label><label>Окончание<input id="monthlyEnd" type="date" required></label></div><button class="primary-btn" id="savePeriod" type="button">Применить период</button><button class="text-btn" id="resetPeriod" type="button">Вернуть календарный месяц</button></div>
+      <div class="cleanup-section admin-only"><span class="section-kicker">Управление записями</span><button class="cleanup-btn" data-clear-scope="day" type="button">Очистить записи за день</button><button class="cleanup-btn" data-clear-scope="month" type="button">Очистить записи за месяц</button><button class="cleanup-btn danger" data-clear-scope="all" type="button">Очистить все записи</button></div>
       <button class="login-btn cabinet-logout" id="logoutBtn" type="button">Выйти из аккаунта</button>
     </section>
   </div>
