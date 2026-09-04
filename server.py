@@ -82,6 +82,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 SESSIONS.discard(session)
             self.send_json({"ok": True}, 200)
             return
+        if self.path == "/api/orders/clear":
+            self.clear_orders()
+            return
         if self.path != "/api/orders":
             self.send_json({"error": "Не найдено"}, 404)
             return
@@ -111,6 +114,29 @@ class AppHandler(BaseHTTPRequestHandler):
             save_orders(orders)
             self.send_json(order, 201)
         except (ValueError, TypeError, json.JSONDecodeError):
+            self.send_json({"error": "Некорректные данные"}, 400)
+
+    def clear_orders(self):
+        if not self.require_auth():
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length))
+            scope = payload.get("scope")
+            period = str(payload.get("period", ""))
+            orders = load_orders()
+            if scope == "all":
+                remaining = []
+            elif scope == "day" and len(period) == 10:
+                remaining = [order for order in orders if order.get("date") != period]
+            elif scope == "month" and len(period) == 7:
+                remaining = [order for order in orders if not str(order.get("date", "")).startswith(period)]
+            else:
+                self.send_json({"error": "Некорректный диапазон очистки"}, 400)
+                return
+            save_orders(remaining)
+            self.send_json({"ok": True, "deleted": len(orders) - len(remaining)})
+        except (TypeError, json.JSONDecodeError):
             self.send_json({"error": "Некорректные данные"}, 400)
 
     def login(self):

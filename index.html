@@ -10,7 +10,7 @@
   <main class="shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark">+</span><span>ОПТ / СБОРКА</span></div>
-      <div class="account-area"><a class="developer-link" href="https://t.me/ShamrikTV" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика"><svg class="telegram-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 4.2 18.4 19c-.24 1.05-.86 1.3-1.75.81l-4.84-3.57-2.34 2.25c-.26.26-.48.48-.98.48l.35-4.93 8.96-8.1c.39-.35-.09-.55-.61-.2L6.11 12.7 1.37 11.2c-1.03-.32-1.05-1.03.22-1.5L20.1 2.55c.86-.32 1.62.2 1.5 1.65Z"></path></svg><span>Telegram разработчика</span></a><div class="status"><span class="status-dot"></span> Локальная база</div><button class="login-btn" id="loginOpen" type="button">Войти</button><button class="login-btn hidden" id="logoutBtn" type="button">Выйти</button></div>
+      <div class="account-area"><a class="developer-link" href="https://t.me/ShamrikTV" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика"><svg class="telegram-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 4.2 18.4 19c-.24 1.05-.86 1.3-1.75.81l-4.84-3.57-2.34 2.25c-.26.26-.48.48-.98.48l.35-4.93 8.96-8.1c.39-.35-.09-.55-.61-.2L6.11 12.7 1.37 11.2c-1.03-.32-1.05-1.03.22-1.5L20.1 2.55c.86-.32 1.62.2 1.5 1.65Z"></path></svg><span>Telegram разработчика</span></a><div class="status"><span class="status-dot"></span> Локальная база</div><button class="login-btn" id="loginOpen" type="button">Войти</button><button class="login-btn hidden" id="cabinetOpen" type="button">Кабинет</button></div>
     </header>
 
     <section class="intro">
@@ -80,6 +80,16 @@
       <p class="login-error hidden" id="editError"></p>
       <div class="form-actions"><button class="primary-btn" type="submit">Сохранить изменения</button><button class="text-btn" id="editCancel" type="button">Отмена</button></div>
     </form>
+  </div>
+  <div class="cabinet-modal hidden" id="cabinetModal" role="dialog" aria-modal="true" aria-labelledby="cabinetTitle">
+    <section class="cabinet-box">
+      <button class="modal-close" id="cabinetClose" type="button" aria-label="Закрыть">×</button>
+      <span class="section-kicker">Профиль редактора</span><h2 id="cabinetTitle">Личный кабинет</h2>
+      <div class="profile-row"><span class="profile-avatar">S</span><div><strong>Shamrik</strong><small>Авторизованный пользователь</small></div></div>
+      <p class="cabinet-hint">В кабинете доступны редактирование и удаление заказов в журнале.</p>
+      <div class="cleanup-section"><span class="section-kicker">Управление записями</span><button class="cleanup-btn" data-clear-scope="day" type="button">Очистить записи за день</button><button class="cleanup-btn" data-clear-scope="month" type="button">Очистить записи за месяц</button><button class="cleanup-btn danger" data-clear-scope="all" type="button">Очистить все записи</button></div>
+      <button class="login-btn cabinet-logout" id="logoutBtn" type="button">Выйти из аккаунта</button>
+    </section>
   </div>
   <div class="login-modal hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <form class="login-box" id="loginForm">

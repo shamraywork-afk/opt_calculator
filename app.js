@@ -64,7 +64,7 @@ function render() {
 function setAuthState(authenticated) {
   state.authenticated = authenticated;
   $('#loginOpen').classList.toggle('hidden', authenticated);
-  $('#logoutBtn').classList.toggle('hidden', !authenticated);
+  $('#cabinetOpen').classList.toggle('hidden', !authenticated);
   $('#orderForm').querySelectorAll('input, textarea, button').forEach((control) => { control.disabled = !authenticated; });
   render();
 }
@@ -72,6 +72,10 @@ function setAuthState(authenticated) {
 function closeEditModal() {
   $('#editModal').classList.add('hidden');
   $('#editError').classList.add('hidden');
+}
+
+function closeCabinetModal() {
+  $('#cabinetModal').classList.add('hidden');
 }
 
 function openEditModal(order) {
@@ -129,13 +133,27 @@ $('#editClose').addEventListener('click', closeEditModal);
 $('#editCancel').addEventListener('click', closeEditModal);
 $('#editModal').addEventListener('click', (event) => { if (event.target === $('#editModal')) closeEditModal(); });
 $('#loginModal').addEventListener('click', (event) => { if (event.target === $('#loginModal')) $('#loginModal').classList.add('hidden'); });
+$('#cabinetOpen').addEventListener('click', () => { $('#cabinetModal').classList.remove('hidden'); });
+$('#cabinetClose').addEventListener('click', closeCabinetModal);
+$('#cabinetModal').addEventListener('click', (event) => { if (event.target === $('#cabinetModal')) closeCabinetModal(); });
+document.querySelectorAll('[data-clear-scope]').forEach((button) => button.addEventListener('click', async () => {
+  const scope = button.dataset.clearScope;
+  const labels = { day: 'выбранный день', month: 'текущий месяц', all: 'все записи' };
+  if (!window.confirm(`Удалить ${labels[scope]}? Это действие нельзя отменить.`)) return;
+  const period = scope === 'day' ? state.filterDate : today.slice(0, 7);
+  const response = await fetch('/api/orders/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope, period }) });
+  if (response.status === 401) { closeCabinetModal(); setAuthState(false); alert('Войдите в систему, чтобы изменять заказы.'); return; }
+  if (!response.ok) { alert('Не удалось очистить записи.'); return; }
+  closeCabinetModal();
+  await loadOrders();
+}));
 $('#loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: $('#loginInput').value, password: $('#passwordInput').value }) });
   if (!response.ok) { $('#loginError').textContent = 'Неверный логин или пароль'; $('#loginError').classList.remove('hidden'); return; }
   $('#loginForm').reset(); $('#loginError').classList.add('hidden'); $('#loginModal').classList.add('hidden'); setAuthState(true);
 });
-$('#logoutBtn').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); resetForm(); setAuthState(false); });
+$('#logoutBtn').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); closeCabinetModal(); resetForm(); setAuthState(false); });
 $('#filterDate').addEventListener('change', (event) => { state.filterDate = event.target.value; render(); });
 document.querySelectorAll('.view-tab').forEach((tab) => tab.addEventListener('click', () => {
   document.querySelectorAll('.view-tab').forEach((item) => item.classList.toggle('active', item === tab));
@@ -172,6 +190,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   $('#loginModal').classList.add('hidden');
   closeEditModal();
+  closeCabinetModal();
 });
 
 $('#exportBtn').addEventListener('click', () => {
