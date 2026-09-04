@@ -4,13 +4,15 @@ from pathlib import Path
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import threading
 
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "orders.json"
 ADMIN_FILE = ROOT / "admin.json"
-PORT = 8000
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8000"))
 SESSIONS = set()
 ADMIN_LOCK = threading.Lock()
 
@@ -231,5 +233,5 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"Оптовый подсчёт запущен: http://localhost:{PORT}")
-    ThreadingHTTPServer(("localhost", PORT), AppHandler).serve_forever()
+    print(f"Оптовый подсчёт запущен: http://{HOST}:{PORT}")
+    ThreadingHTTPServer((HOST, PORT), AppHandler).serve_forever()
