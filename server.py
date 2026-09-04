@@ -125,6 +125,10 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_file("styles.css", "text/css; charset=utf-8")
         elif self.path == "/app.js":
             self.send_file("app.js", "application/javascript; charset=utf-8")
+        elif self.path == "/admin":
+            self.send_file("admin.html", "text/html; charset=utf-8")
+        elif self.path == "/admin.js":
+            self.send_file("admin.js", "application/javascript; charset=utf-8")
         else:
             self.send_json({"error": "Не найдено"}, 404)
 
@@ -226,7 +230,11 @@ class AppHandler(BaseHTTPRequestHandler):
             if account is None or not hmac.compare_digest(hash_password(password, account["salt"]), account["password_hash"]):
                 self.send_json({"error": "Неверный логин или пароль"}, 401)
                 return
-            self.start_session(login, "admin" if account is admin else "user", account.get("avatar", ""))
+            role = "admin" if account is admin else "user"
+            if payload.get("admin_only") and role != "admin":
+                self.send_json({"error": "Доступно только администратору"}, 403)
+                return
+            self.start_session(login, role, account.get("avatar", ""))
         except (TypeError, json.JSONDecodeError):
             self.send_json({"error": "Некорректные данные"}, 400)
 

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход администратора</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <a class="admin-brand" href="/">ОПТ / СБОРКА</a>
+    <form class="login-box admin-login-box" id="adminForm">
+      <span class="section-kicker">/admin</span>
+      <h1 id="adminTitle">Вход администратора</h1>
+      <p class="auth-hint" id="adminHint"></p>
+      <label>Логин<input id="adminLogin" autocomplete="username" required></label>
+      <label>Пароль<input id="adminPassword" type="password" autocomplete="current-password" required></label>
+      <label class="hidden" id="adminPasswordConfirmLabel">Повторите пароль<input id="adminPasswordConfirm" type="password" autocomplete="new-password"></label>
+      <p class="login-error hidden" id="adminError"></p>
+      <button class="primary-btn" id="adminSubmit" type="submit">Войти</button>
+      <a class="back-link" href="/">Вернуться к журналу</a>
+    </form>
+  </main>
+  <script src="/admin.js"></script>
+</body>
+</html>
